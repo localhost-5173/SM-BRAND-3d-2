@@ -1,0 +1,35 @@
+{
+  "name": "sm-brand-backend",
+  "version": "1.0.0",
+  "description": "Backend API and database services for SM BRAND Industrial Strapping & Packaging Systems",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node src/utils/seed.js",
+    "create-admin": "node src/utils/createAdmin.js"
+  },
+  "keywords": [
+    "sm-brand",
+    "packaging",
+    "strapping",
+    "backend",
+    "express",
+    "mongodb"
+  ],
+  "author": "SM Brand Engineering",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.5.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}

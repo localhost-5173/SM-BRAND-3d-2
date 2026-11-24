@@ -208,6 +208,7 @@
     document.getElementById('loadingState').style.display = s === 'loading' ? 'block' : 'none';
     document.getElementById('notFoundState').style.display = s === 'notfound' ? 'block' : 'none';
     document.getElementById('productDetail').style.display = s === 'ready' ? 'block' : 'none';
+    if (window.lucide) lucide.createIcons();
   }
 
   function render(p){

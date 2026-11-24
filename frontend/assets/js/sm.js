@@ -127,7 +127,7 @@
       });
     }
 
-    // Smooth Page Curtain Transition
+    // Smooth Page Curtain Transition (Instant Native Navigation)
     var curtain = $('.curtain');
     if (curtain) {
       window.addEventListener('pageshow', function () { curtain.classList.remove('on'); });
@@ -137,27 +137,36 @@
         var href = a.getAttribute('href');
         if (!href || href.charAt(0) === '#' || /^(https?:|mailto:|tel:)/.test(href)) return;
         if (href.split('#')[0] === location.pathname.split('/').pop()) return;
-        e.preventDefault();
         curtain.classList.add('on');
-        setTimeout(function () { location.href = href; }, 280);
       });
     }
 
-    // Dynamic Cursor Spotlight (Fine Pointers)
+    // Dynamic Cursor Spotlight (Fine Pointers, Event-Driven RAF)
     var glow = $('.cursor-glow');
     if (glow && fine && !reduce) {
-      var gx = 0, gy = 0, tx = 0, ty = 0;
+      var gx = 0, gy = 0, tx = 0, ty = 0, rafId = null, active = false;
+      function tick() {
+        var dx = tx - gx;
+        var dy = ty - gy;
+        gx += dx * 0.15;
+        gy += dy * 0.15;
+        glow.style.transform = 'translate(' + Math.round(gx) + 'px,' + Math.round(gy) + 'px)';
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+          rafId = requestAnimationFrame(tick);
+        } else {
+          active = false;
+          rafId = null;
+        }
+      }
       window.addEventListener('pointermove', function (e) {
         tx = e.clientX;
         ty = e.clientY;
         glow.classList.add('on');
-      });
-      (function loop() {
-        gx += (tx - gx) * 0.12;
-        gy += (ty - gy) * 0.12;
-        glow.style.transform = 'translate(' + gx + 'px,' + gy + 'px)';
-        requestAnimationFrame(loop);
-      })();
+        if (!active) {
+          active = true;
+          rafId = requestAnimationFrame(tick);
+        }
+      }, { passive: true });
     }
   }
 

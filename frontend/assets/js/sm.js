@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var WA = '923102261760';
+  var WA = window.SM_FALLBACK_WA || '923102261760';
   var doc = document.documentElement;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var fine = window.matchMedia && matchMedia('(pointer:fine)').matches;
@@ -20,8 +20,33 @@
     });
   };
 
+  SM.safeUrl = function (u) {
+    if (!u || typeof u !== 'string') return '';
+    var s = u.trim();
+    if (/^https:\/\//i.test(s)) return s;
+    if (/^\/(?!\/)/.test(s)) return s;
+    if (/^assets\/[a-zA-Z0-9_\-\.\/]+$/i.test(s)) return s;
+    return '';
+  };
+
+  /* ---------- Dynamic Settings & Contact Details ---------- */
+  SM.settings = null;
+
+  SM.getWhatsAppNumber = function () {
+    return (SM.settings && SM.settings.whatsapp_number) || window.SM_FALLBACK_WA || WA;
+  };
+
+  SM.getPhoneDisplay = function () {
+    return (SM.settings && SM.settings.phone_display) || '+92 310 2261760';
+  };
+
+  SM.getEmail = function () {
+    return (SM.settings && SM.settings.email) || 'ar7776845@gmail.com';
+  };
+
   SM.waLink = function (text) {
-    return 'https://wa.me/' + WA + '?text=' + encodeURIComponent(text);
+    var num = SM.getWhatsAppNumber();
+    return 'https://wa.me/' + num + (text ? '?text=' + encodeURIComponent(text) : '');
   };
 
   SM.quote = function (name) {
@@ -32,6 +57,110 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   SM.$ = $;
   SM.$$ = $$;
+
+  SM.applySettings = function (data) {
+    if (!data) return;
+    SM.settings = data;
+    var wa = SM.getWhatsAppNumber();
+    var phone = SM.getPhoneDisplay();
+    var email = SM.getEmail();
+
+    // 1. Rewrite all WhatsApp CTA links
+    $$('[data-wa-link]').forEach(function (el) {
+      var msg = el.getAttribute('data-wa-text');
+      if (!msg) {
+        var href = el.getAttribute('href') || '';
+        var match = href.match(/[?&]text=([^&]+)/);
+        msg = match ? decodeURIComponent(match[1]) : 'Salam SM Brand, quote chahiye';
+      }
+      el.href = SM.waLink(msg);
+    });
+
+    var waFloat = document.getElementById('waFloat');
+    if (waFloat) {
+      var fMsg = waFloat.getAttribute('data-wa-text');
+      if (!fMsg) {
+        var fHref = waFloat.getAttribute('href') || '';
+        var fMatch = fHref.match(/[?&]text=([^&]+)/);
+        fMsg = fMatch ? decodeURIComponent(fMatch[1]) : 'Salam SM Brand, quote chahiye';
+      }
+      waFloat.href = SM.waLink(fMsg);
+    }
+
+    // 2. Rewrite phone display elements
+    $$('[data-phone]').forEach(function (el) {
+      el.textContent = phone;
+    });
+
+    // 3. Rewrite email elements
+    $$('[data-email]').forEach(function (el) {
+      if (el.tagName === 'A') {
+        el.href = 'mailto:' + email;
+      }
+      el.textContent = email;
+    });
+
+    // 4. Rewrite operating hours
+    if (data.operating_hours) {
+      $$('[data-operating-hours]').forEach(function (el) {
+        el.innerHTML = '<b>Monday – Saturday:</b> ' + SM.esc(data.operating_hours) +
+          (data.emergency_hours ? '<br><b>Sunday:</b> ' + SM.esc(data.emergency_hours) : '');
+      });
+    }
+
+    // 5. Rewrite depots list
+    if (Array.isArray(data.depots) && data.depots.length) {
+      $$('[data-depots]').forEach(function (ul) {
+        ul.innerHTML = data.depots.map(function (d) {
+          return '<li><b>' + SM.esc(d.city + (d.hub_name ? ' (' + d.hub_name + ')' : '')) + ':</b> ' +
+            SM.esc(d.address || '') + (d.hours ? ' (' + SM.esc(d.hours) + ')' : '') + '</li>';
+        }).join('');
+      });
+    }
+  };
+
+  function getApiBase() {
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    return typeof window.SM_API_BASE === 'string'
+      ? window.SM_API_BASE
+      : (isHttp ? window.location.origin : '');
+  }
+
+  SM.fetchSettings = function () {
+    try {
+      var cached = sessionStorage.getItem('sm_settings');
+      if (cached) {
+        SM.applySettings(JSON.parse(cached));
+      }
+    } catch (e) {}
+
+    var base = getApiBase();
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    if (!isHttp && !base) return Promise.resolve(SM.settings);
+
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { ctrl && ctrl.abort(); }, 5000);
+
+    return fetch(base + '/api/settings', ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) {
+        if (!r.ok) throw new Error('Settings fetch failed');
+        return r.json();
+      })
+      .then(function (res) {
+        if (res && res.success && res.data) {
+          try {
+            sessionStorage.setItem('sm_settings', JSON.stringify(res.data));
+          } catch (e) {}
+          SM.applySettings(res.data);
+          return res.data;
+        }
+      })
+      .catch(function () {})
+      .then(function (res) {
+        clearTimeout(timer);
+        return res;
+      });
+  };
 
   // Global event delegation for quote buttons
   document.addEventListener('click', function (e) {
@@ -397,11 +526,12 @@
 
   /* ---------- Product API & Fallback Data ---------- */
   SM.fetchProducts = function (category) {
-    var base = window.SM_API_BASE || '';
+    var base = getApiBase();
     var fallback = (window.SM_FALLBACK || []).filter(function (p) {
       return !category || p.category === category;
     });
-    if (!base) return Promise.resolve(fallback);
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    if (!isHttp && !base) return Promise.resolve(fallback);
 
     var ctrl = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function () { ctrl && ctrl.abort(); }, 5000);
@@ -425,26 +555,35 @@
   };
 
   SM.fetchProduct = function (key) {
-    var base = window.SM_API_BASE || '';
+    var base = getApiBase();
     var local = (window.SM_FALLBACK || []).filter(function (p) {
       return p.slug === key || String(p.id) === key;
     })[0];
-    if (!base) return Promise.resolve(local || null);
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    if (!isHttp && !base) return Promise.resolve(local || null);
 
-    return fetch(base + '/api/products/' + encodeURIComponent(key))
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { ctrl && ctrl.abort(); }, 5000);
+
+    return fetch(base + '/api/products/' + encodeURIComponent(key), ctrl ? { signal: ctrl.signal } : {})
       .then(function (r) {
         if (!r.ok) throw new Error('Not found');
         return r.json();
       })
       .catch(function () {
         return local || null;
+      })
+      .then(function (res) {
+        clearTimeout(timer);
+        return res;
       });
   };
 
-  // Upgraded Product Card Template (Inspired by Reference Image 2 Status Pill)
+  // Upgraded Product Card Template (Validated URLs & Status Pill)
   SM.cardHTML = function (p) {
-    var url = window.SM_PRODUCT_URL(p.slug);
-    var img = window.SM_ASSET_URL(p.img);
+    var url = SM.safeUrl(window.SM_PRODUCT_URL ? window.SM_PRODUCT_URL(p.slug) : '') || ('product.html?slug=' + encodeURIComponent(p.slug));
+    var rawImg = window.SM_ASSET_URL ? window.SM_ASSET_URL(p.img) : p.img;
+    var img = SM.safeUrl(rawImg) || SM.fallbackImg(p.name);
     var isHot = /best|hot|new/i.test(p.badge || '');
     var pillClass = isHot ? 'status-pill orange' : 'status-pill active';
     var pillText = p.badge || 'In Stock';
@@ -472,7 +611,8 @@
   };
 
   SM.renderCards = function (container, list, filter) {
-    var items = list.filter(function (p) {
+    var items = (list || []).filter(function (p) {
+      if (!p || p.is_active === false) return false;
       return !filter || filter === 'all' || p.tag === filter;
     });
     if (!items.length) {
@@ -518,10 +658,123 @@
     });
   };
 
+  /* ---------- Comparison Matrix Table Hydration ---------- */
+  SM.initCompareTable = function () {
+    var tbl = document.getElementById('compareTable');
+    if (!tbl) return;
+
+    var base = getApiBase();
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    if (!isHttp && !base) return;
+
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { ctrl && ctrl.abort(); }, 5000);
+
+    fetch(base + '/api/products?compared=true', ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) {
+        if (!r.ok) throw new Error('Compare fetch failed');
+        return r.json();
+      })
+      .then(function (products) {
+        if (!Array.isArray(products) || !products.length) return;
+
+        var thead = '<thead><tr><th>Specification</th>' + products.map(function (p) {
+          return '<th>' + SM.esc(p.name) + (p.badge ? ' (' + SM.esc(p.badge) + ')' : '') + '</th>';
+        }).join('') + '</tr></thead>';
+
+        function getSpec(p, pattern) {
+          if (!p.specs || !Array.isArray(p.specs)) return '—';
+          for (var i = 0; i < p.specs.length; i++) {
+            if (pattern.test(p.specs[i][0])) return SM.esc(p.specs[i][1]);
+          }
+          return '—';
+        }
+
+        var rows = [
+          { label: 'Strapping Speed', fn: function (p) { return getSpec(p, /speed/i); } },
+          { label: 'Compatible Strap', fn: function (p) { return getSpec(p, /strap/i); } },
+          { label: 'Optimal Daily Volume', fn: function (p) {
+            var v = getSpec(p, /volume|daily|capacity/i);
+            if (v !== '—') return v;
+            if (p.slug === 'sm450') return 'Under 200 boxes / day';
+            if (p.slug === 'sm601') return '200 – 1,200 boxes / day';
+            if (p.slug === 'sm801') return '1,200+ boxes / day';
+            if (p.slug === 'sm950') return 'Continuous line (2,500+)';
+            return '—';
+          } },
+          { label: 'Tension Control', fn: function (p) { return getSpec(p, /tension/i); } },
+          { label: 'Power Requirement', fn: function (p) { return getSpec(p, /power/i); } },
+          { label: 'Price', fn: function (p) { return '<b>' + SM.esc(p.price_label || 'On Inquiry') + '</b>'; } },
+          { label: 'Action', fn: function (p) {
+            var cls = p.badge === 'Best Seller' ? 'btn-primary' : 'btn-ghost';
+            return '<button class="btn ' + cls + ' btn-sm" data-quote="' + SM.esc(p.name) + '">Quote</button>';
+          } }
+        ];
+
+        var tbody = '<tbody>' + rows.map(function (row) {
+          return '<tr><td>' + SM.esc(row.label) + '</td>' + products.map(function (p) {
+            return '<td>' + row.fn(p) + '</td>';
+          }).join('') + '</tr>';
+        }).join('') + '</tbody>';
+
+        tbl.innerHTML = thead + tbody;
+        bindPointerFx(tbl);
+      })
+      .catch(function () {})
+      .then(function () { clearTimeout(timer); });
+  };
+
+  /* ---------- Spares Inventory Table Hydration ---------- */
+  SM.initSparesTable = function () {
+    var tbody = document.getElementById('sparesBody');
+    if (!tbody) return;
+
+    var base = getApiBase();
+    var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+    if (!isHttp && !base) return;
+
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { ctrl && ctrl.abort(); }, 5000);
+
+    fetch(base + '/api/spares', ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) {
+        if (!r.ok) throw new Error('Spares fetch failed');
+        return r.json();
+      })
+      .then(function (res) {
+        if (!res || !res.success || !Array.isArray(res.data) || !res.data.length) return;
+
+        tbody.innerHTML = res.data.map(function (item) {
+          var pill = '<span class="status-pill active"><span class="led"></span> In Stock</span>';
+          if (item.status_badge === 'lead_time') {
+            pill = '<span class="status-pill warning"><span class="led"></span> 2–3 Days</span>';
+          } else if (item.status_badge === 'discontinued') {
+            pill = '<span class="status-pill"><span class="led"></span> On Request</span>';
+          }
+          return '<tr>' +
+            '<td style="color:var(--ink);font-weight:700">' + SM.esc(item.name) + '</td>' +
+            '<td>' + SM.esc(item.compatible_models || 'All Models') + '</td>' +
+            '<td>' + pill + '</td>' +
+            '<td><b>' + SM.esc(item.price_label || 'On Inquiry') + '</b></td>' +
+            '<td style="text-align:right"><button class="btn btn-ghost btn-sm" data-quote="' + SM.esc(item.name) + '">Quote</button></td>' +
+            '</tr>';
+        }).join('');
+        bindPointerFx(tbody);
+      })
+      .catch(function () {})
+      .then(function () { clearTimeout(timer); });
+  };
+
   /* ---------- Interactive Machine Finder Wizard ---------- */
   SM.initFinder = function () {
     var btn = $('#finderBtn');
     if (!btn) return;
+
+    var productsCatalog = null;
+    SM.fetchProducts('').then(function (list) {
+      productsCatalog = list;
+      showResult();
+    });
 
     function pickRecommendation() {
       var what = $('#f_product') ? $('#f_product').value : 'Carton Boxes';
@@ -549,6 +802,19 @@
       if (what === 'Pallets / Export' && bud !== 'low' && vol === 'low') {
         rec = { n: 'ZP-19 Battery Tool', p: 'Rs 148,000', note: 'Cordless PET strapping tool pallets aur export containers ke liye. Compressor ki zaroorat nahi.' };
       }
+
+      // Dynamically resolve live price and model name from database catalog
+      if (productsCatalog && Array.isArray(productsCatalog)) {
+        var match = productsCatalog.filter(function (p) {
+          if (!p || p.is_active === false) return false;
+          return p.name.toLowerCase().indexOf(rec.n.toLowerCase().split(' ')[0]) !== -1;
+        })[0];
+        if (match) {
+          rec.n = match.name;
+          if (match.price_label) rec.p = match.price_label;
+        }
+      }
+
       return rec;
     }
 
@@ -558,7 +824,7 @@
       var noteEl = $('#finderResult .rec-note');
       var waBtn = $('#finderResult .rec-wa');
 
-      if (nameEl) nameEl.innerHTML = SM.esc(r.n) + ' • <b>' + SM.esc(r.p) + '</b>';
+      if (nameEl) nameEl.innerHTML = SM.esc(r.n) + (r.p ? ' • <b>' + SM.esc(r.p) + '</b>' : '');
       if (noteEl) noteEl.textContent = r.note;
       if (waBtn) waBtn.setAttribute('data-quote', r.n);
 
@@ -593,8 +859,11 @@
       var name = (field('q_name') ? field('q_name').value : '').trim();
       var wa = (field('q_wa') ? field('q_wa').value : '').trim();
       var digits = wa.replace(/\D/g, '');
+      if (digits.startsWith('03') && digits.length === 11) {
+        digits = '92' + digits.substring(1);
+      }
       var okName = name.length >= 2;
-      var okWa = digits.length >= 10 && digits.length <= 14;
+      var okWa = digits.length >= 10 && digits.length <= 15;
 
       setInvalid('q_name', !okName);
       setInvalid('q_wa', !okWa);
@@ -611,10 +880,21 @@
         'Requirement: ' + need +
         (msg ? '\nNote: ' + msg : '');
 
-      window.open(SM.waLink(text), '_blank', 'noopener');
+      var waUrl = SM.waLink(text);
+      var win = window.open(waUrl, '_blank', 'noopener');
 
       var note = $('#quoteMsg');
-      if (note) note.classList.add('show');
+      if (note) {
+        if (!win || win.closed || typeof win.closed === 'undefined') {
+          note.innerHTML = '✓ Quote request logged. Popup window was blocked — <a href="' + SM.esc(waUrl) + '" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline;font-weight:700">Click here to open WhatsApp</a>.';
+        } else {
+          note.innerHTML = '✓ Done! WhatsApp window opened — send the prefilled message to receive your instant PDF quote. (<a href="' + SM.esc(waUrl) + '" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline">Re-open chat</a>)';
+        }
+        note.classList.add('show');
+      }
+
+      form.reset();
+
       var submitBtn = form.querySelector('button[type=submit]');
       if (submitBtn) submitBtn.disabled = true;
       submitting = true;
@@ -624,14 +904,16 @@
         submitting = false;
       }, 4000);
 
-      // Save lead to backend if API base is configured
-      if (window.SM_API_BASE) {
-        fetch(window.SM_API_BASE + '/api/leads', {
+      // Save lead to backend
+      var base = getApiBase();
+      var isHttp = typeof window !== 'undefined' && window.location && /^https?:/.test(window.location.protocol);
+      if (base || isHttp) {
+        fetch((base || '') + '/api/leads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: name,
-            whatsapp: wa,
+            whatsapp: digits,
             city: city,
             need: need,
             message: msg,
@@ -665,6 +947,9 @@
     splitText();
     bindPointerFx();
     initAnimations();
+    SM.fetchSettings();
+    SM.initCompareTable();
+    SM.initSparesTable();
     SM.initFinder();
     SM.initQuoteForm();
     initLucideIcons();

@@ -72,7 +72,7 @@
         Supplying 1,400+ manufacturing plants across Pakistan with heavy-duty automatic arch machines, reliable semi-automatic strappers, and export-grade virgin rolls. Same-day Karachi dispatch with 1 year complete warranty.
       </p>
       <div class="hero-ctas" data-in>
-        <a class="btn btn-primary" data-magnetic href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20industrial%20strapping%20machine%20quote%20chahiye" target="_blank" rel="noopener">
+        <a class="btn btn-primary" data-magnetic data-wa-link data-wa-text="Salam SM Brand, industrial strapping machine quote chahiye" href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20industrial%20strapping%20machine%20quote%20chahiye" target="_blank" rel="noopener">
           <span>Request Quotation</span>
           <i data-lucide="arrow-right"></i>
         </a>
@@ -453,11 +453,11 @@
         <div class="cta-box">
           <b>Direct Engineering Desk</b>
           <span>Fast Reply ~6 min • Mon–Sat 9am – 9pm PKT</span>
-          <a class="btn btn-primary btn-block" data-magnetic href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20packaging%20audit%20quote%20chahiye" target="_blank" rel="noopener">
+          <a class="btn btn-primary btn-block" data-magnetic data-wa-link data-wa-text="Salam SM Brand, packaging audit quote chahiye" href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20packaging%20audit%20quote%20chahiye" target="_blank" rel="noopener">
             <span>Chat on WhatsApp</span>
             <i data-lucide="message-square"></i>
           </a>
-          <div style="font-size:12.5px;color:var(--muted);margin-top:14px">Direct Line: +92 310 2261760</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:14px">Direct Line: <span data-phone>+92 310 2261760</span></div>
         </div>
       </div>
     </div>
@@ -477,8 +477,8 @@
         </a>
         <p>Industrial Strapping Machines • Virgin PP/PET Rolls • Cordless Tools • Technical Service &amp; Spares.<br>Karachi – Lahore – Faisalabad</p>
         <p style="color:var(--ink);font-weight:600">
-          +92 310 2261760<br>
-          <a href="mailto:ar7776845@gmail.com" style="display:inline;padding:0">ar7776845@gmail.com</a><br>
+          <span data-phone>+92 310 2261760</span><br>
+          <a href="mailto:ar7776845@gmail.com" data-email style="display:inline;padding:0">ar7776845@gmail.com</a><br>
           <span style="font-weight:400;color:var(--muted)">Plot 14, S.I.T.E Industrial Area, Karachi</span>
         </p>
       </div>
@@ -512,7 +512,7 @@
 </footer>
 
 <!-- Floating WhatsApp Widget -->
-<a class="wa" id="waFloat" href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20quote%20chahiye" target="_blank" rel="noopener" aria-label="WhatsApp engineering quote">
+<a class="wa" id="waFloat" data-wa-link data-wa-text="Salam SM Brand, quote chahiye" href="https://wa.me/923102261760?text=Salam%20SM%20Brand,%20quote%20chahiye" target="_blank" rel="noopener" aria-label="WhatsApp engineering quote">
   <i data-lucide="message-circle"></i>
   <span>WhatsApp Quote</span>
 </a>
@@ -534,10 +534,11 @@
   if(!box) return;
   box.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
   SM.fetchProducts('').then(function(all){
+    var list = (all || []).filter(function(p){ return p && p.is_active !== false; });
     var picks = want.map(function(w){
-      return all.filter(function(p){return p.slug===w[1];})[0] || all.filter(function(p){return p.category===w[0];})[0];
+      return list.filter(function(p){return p.slug===w[1];})[0] || list.filter(function(p){return p.category===w[0];})[0];
     }).filter(Boolean);
-    if(!picks.length) picks = all.slice(0,3);
+    if(!picks.length) picks = list.slice(0,3);
     SM.renderCards(box, picks);
   });
 })();

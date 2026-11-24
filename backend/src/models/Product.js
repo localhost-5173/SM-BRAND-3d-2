@@ -57,12 +57,14 @@ const ProductSchema = new mongoose.Schema(
       trim: true,
       validate: {
         validator: function (val) {
-          const cat = this.category;
+          const update = this.getUpdate ? (this.getUpdate().$set || this.getUpdate()) : null;
+          const cat = this.category || (update && update.category);
           const allowedTags = CATEGORY_TAG_MAP[cat];
           return Array.isArray(allowedTags) && allowedTags.includes(val);
         },
         message: function (props) {
-          const cat = this.category;
+          const update = this.getUpdate ? (this.getUpdate().$set || this.getUpdate()) : null;
+          const cat = this.category || (update && update.category);
           const allowed = CATEGORY_TAG_MAP[cat] ? CATEGORY_TAG_MAP[cat].join(', ') : 'none';
           return `Tag '${props.value}' is not valid for category '${cat}'. Allowed tags: ${allowed}`;
         }

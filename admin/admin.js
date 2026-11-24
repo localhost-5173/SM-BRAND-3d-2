@@ -309,6 +309,553 @@
       });
   };
 
+  // --- SCREEN 3: Product Management Controller ---
+  var CATEGORY_TAG_MAP = {
+    machines: ['semi', 'auto', 'high'],
+    rolls: ['pp', 'pet', 'acc'],
+    battery: ['battery'],
+    hand: ['hand']
+  };
+
+  AdminApp.screens.products = function (container) {
+    container.innerHTML =
+      '<div class="screen-header">' +
+        '<div>' +
+          '<h1 class="screen-title">Product Catalog</h1>' +
+          '<div class="screen-subtitle">Manage strapping machines, packaging rolls, and handheld tools</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm" id="addProductBtn" type="button">' +
+          '<i data-lucide="plus" style="width:16px;height:16px"></i> Add Product' +
+        '</button>' +
+      '</div>' +
+      '<div class="admin-card">' +
+        '<div class="admin-card-header">' +
+          '<div class="toolbar">' +
+            '<div class="search-box">' +
+              '<i data-lucide="search"></i>' +
+              '<input type="text" id="productSearch" placeholder="Search products by name or slug...">' +
+            '</div>' +
+            '<select class="filter-select" id="productCategoryFilter">' +
+              '<option value="all">All Categories</option>' +
+              '<option value="machines">Machines</option>' +
+              '<option value="rolls">Strapping Rolls</option>' +
+              '<option value="battery">Battery Tools</option>' +
+              '<option value="hand">Manual Hand Tools</option>' +
+            '</select>' +
+          '</div>' +
+          '<div style="font-size:13px;color:var(--muted)" id="productCountBadge">Loading...</div>' +
+        '</div>' +
+        '<div class="table-responsive" id="productsTableBox">' +
+          '<div style="padding:24px"><div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div></div>' +
+        '</div>' +
+      '</div>';
+
+    var allProducts = [];
+    var searchInput = document.getElementById('productSearch');
+    var catFilter = document.getElementById('productCategoryFilter');
+    var countBadge = document.getElementById('productCountBadge');
+    var tableBox = document.getElementById('productsTableBox');
+
+    function renderTable() {
+      var q = (searchInput.value || '').trim().toLowerCase();
+      var cat = catFilter.value;
+
+      var filtered = allProducts.filter(function (p) {
+        var matchCat = cat === 'all' || p.category === cat;
+        var matchQ = !q || (p.name && p.name.toLowerCase().indexOf(q) !== -1) || (p.slug && p.slug.toLowerCase().indexOf(q) !== -1);
+        return matchCat && matchQ;
+      });
+
+      countBadge.textContent = 'Showing ' + filtered.length + ' of ' + allProducts.length + ' products';
+
+      if (!filtered.length) {
+        tableBox.innerHTML =
+          '<div class="empty-state">' +
+            '<i data-lucide="package-search"></i>' +
+            '<p>No products found matching your filter criteria.</p>' +
+          '</div>';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      var html =
+        '<table class="admin-table">' +
+          '<thead>' +
+            '<tr>' +
+              '<th style="width:56px">Item</th>' +
+              '<th>Name &amp; Slug</th>' +
+              '<th>Category &amp; Tag</th>' +
+              '<th>Price Display</th>' +
+              '<th>Compare</th>' +
+              '<th>Status</th>' +
+              '<th style="text-align:right">Actions</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' +
+            filtered.map(function (p) {
+              var thumb = safeUrl(p.img) || '/assets/img/rolls.jpg';
+              var isActive = p.is_active !== false;
+              var isCompared = p.is_compared === true;
+
+              return '<tr data-id="' + esc(p._id) + '">' +
+                '<td>' +
+                  '<img src="' + esc(thumb) + '" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--panel-3)" onerror="this.src=\'data:image/svg+xml;utf8,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' width=\\\'44\\\' height=\\\'44\\\' fill=\\\'%2326262a\\\'><rect width=\\\'44\\\' height=\\\'44\\\'/></svg>\'">' +
+                '</td>' +
+                '<td>' +
+                  '<div style="font-weight:700;color:var(--text)">' + esc(p.name) + '</div>' +
+                  '<div style="font-size:12px;color:var(--muted-2);font-family:monospace">' + esc(p.slug) + '</div>' +
+                '</td>' +
+                '<td>' +
+                  '<span style="font-weight:600;text-transform:capitalize">' + esc(p.category) + '</span>' +
+                  '<span style="color:var(--muted-2)"> / ' + esc(p.tag) + '</span>' +
+                '</td>' +
+                '<td>' +
+                  '<b>' + esc(p.price_label || 'On Inquiry') + '</b>' +
+                  (p.badge ? ' <span class="status-pill warning" style="padding:1px 6px;font-size:10.5px">' + esc(p.badge) + '</span>' : '') +
+                '</td>' +
+                '<td>' +
+                  (isCompared
+                    ? '<span class="status-pill active" style="font-size:11px"><span class="led"></span> Yes (' + esc(p.compare_order || 0) + ')</span>'
+                    : '<span style="color:var(--muted-2);font-size:12px">—</span>') +
+                '</td>' +
+                '<td>' +
+                  '<button class="status-pill ' + (isActive ? 'active' : 'muted') + ' toggle-active-btn" type="button" style="cursor:pointer" title="Click to toggle visibility">' +
+                    '<span class="led"></span> ' + (isActive ? 'Active' : 'Hidden') +
+                  '</button>' +
+                '</td>' +
+                '<td style="text-align:right;white-space:nowrap">' +
+                  '<button class="btn btn-ghost btn-sm edit-btn" type="button" style="padding:5px 10px;margin-right:6px">Edit</button>' +
+                  '<button class="btn btn-ghost btn-sm delete-btn" type="button" style="padding:5px 10px;color:#f87171">Delete</button>' +
+                '</td>' +
+              '</tr>';
+            }).join('') +
+          '</tbody>' +
+        '</table>';
+
+      tableBox.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+
+      // Bind Row Actions
+      tableBox.querySelectorAll('.toggle-active-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var tr = btn.closest('tr');
+          var id = tr.getAttribute('data-id');
+          var prod = allProducts.find(function (x) { return x._id === id; });
+          if (!prod) return;
+
+          var nextActive = prod.is_active === false;
+          btn.disabled = true;
+
+          api('/api/admin/products/' + id, {
+            method: 'PUT',
+            body: { is_active: nextActive }
+          })
+            .then(function (res) {
+              prod.is_active = res.data.is_active;
+              toast(prod.name + (nextActive ? ' published to site.' : ' hidden from public site.'));
+              renderTable();
+            })
+            .catch(function (err) {
+              btn.disabled = false;
+              toast('Failed updating status: ' + err.message, 'error');
+            });
+        });
+      });
+
+      tableBox.querySelectorAll('.edit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.closest('tr').getAttribute('data-id');
+          var prod = allProducts.find(function (x) { return x._id === id; });
+          if (prod) openProductModal(prod);
+        });
+      });
+
+      tableBox.querySelectorAll('.delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.closest('tr').getAttribute('data-id');
+          var prod = allProducts.find(function (x) { return x._id === id; });
+          if (!prod) return;
+
+          confirmModal(
+            'Delete Product',
+            'Are you sure you want to permanently delete "' + prod.name + '"? This action cannot be undone. To remove it from public view without deleting, you can hide it instead.',
+            function (choice) {
+              if (choice === 'hide') {
+                api('/api/admin/products/' + id, {
+                  method: 'PUT',
+                  body: { is_active: false }
+                })
+                  .then(function () {
+                    prod.is_active = false;
+                    toast(prod.name + ' hidden from catalog.');
+                    renderTable();
+                  })
+                  .catch(function (err) { toast('Error: ' + err.message, 'error'); });
+              } else if (choice === 'delete') {
+                api('/api/admin/products/' + id, { method: 'DELETE' })
+                  .then(function () {
+                    allProducts = allProducts.filter(function (x) { return x._id !== id; });
+                    toast(prod.name + ' deleted permanently.');
+                    renderTable();
+                  })
+                  .catch(function (err) { toast('Delete failed: ' + err.message, 'error'); });
+              }
+            },
+            'Delete Permanently',
+            'Hide Product Instead'
+          );
+        });
+      });
+    }
+
+    function loadProducts() {
+      api('/api/admin/products')
+        .then(function (res) {
+          allProducts = res.data || [];
+          renderTable();
+        })
+        .catch(function (err) {
+          tableBox.innerHTML = '<div style="padding:24px;color:#f87171">Failed loading products: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    searchInput.addEventListener('input', renderTable);
+    catFilter.addEventListener('change', renderTable);
+    document.getElementById('addProductBtn').addEventListener('click', function () {
+      openProductModal(null);
+    });
+
+    loadProducts();
+
+    // Product Modal Editor Function
+    function openProductModal(item) {
+      var isEdit = Boolean(item);
+      var category = item ? item.category : 'machines';
+      var allowedTags = CATEGORY_TAG_MAP[category] || ['semi'];
+      var tag = item ? item.tag : allowedTags[0];
+      var specs = (item && Array.isArray(item.specs)) ? item.specs : [
+        ['Speed', '24 straps / min'],
+        ['Strap', 'PP 9–15mm'],
+        ['Power', '220V']
+      ];
+
+      var formHtml =
+        '<form id="productModalForm" novalidate>' +
+          '<div class="form-grid">' +
+            '<div class="form-field">' +
+              '<label for="m_category">Category *</label>' +
+              '<select id="m_category" required>' +
+                '<option value="machines"' + (category === 'machines' ? ' selected' : '') + '>Machines</option>' +
+                '<option value="rolls"' + (category === 'rolls' ? ' selected' : '') + '>Strapping Rolls</option>' +
+                '<option value="battery"' + (category === 'battery' ? ' selected' : '') + '>Battery Tools</option>' +
+                '<option value="hand"' + (category === 'hand' ? ' selected' : '') + '>Manual Hand Tools</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_tag">Filter Tag *</label>' +
+              '<select id="m_tag" required></select>' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label for="m_name">Product Name *</label>' +
+              '<input type="text" id="m_name" value="' + esc(item ? item.name : '') + '" placeholder="e.g. SM-601 Pro Semi-Auto" required>' +
+              '<div class="field-error" id="err_name"></div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_slug">URL Slug * ' + (isEdit ? '<span style="color:var(--amber);font-size:11px">(Immutable)</span>' : '') + '</label>' +
+              '<input type="text" id="m_slug" value="' + esc(item ? item.slug : '') + '" placeholder="sm-601-pro" ' + (isEdit ? 'disabled' : 'required') + '>' +
+              '<div class="field-hint">' + (isEdit ? 'Slug cannot be modified after product creation.' : 'Lowercase kebab-case e.g. sm-601-pro') + '</div>' +
+              '<div class="field-error" id="err_slug"></div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_price_label">Price Label *</label>' +
+              '<input type="text" id="m_price_label" value="' + esc(item ? item.price_label : 'Rs 285,000') + '" placeholder="Rs 285,000" required>' +
+              '<div class="field-error" id="err_price_label"></div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_price_numeric">Price Numeric (Optional)</label>' +
+              '<input type="number" id="m_price_numeric" value="' + esc(item && item.price_numeric !== undefined ? item.price_numeric : '') + '" placeholder="285000">' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_badge">Badge Highlight</label>' +
+              '<input type="text" id="m_badge" value="' + esc(item ? item.badge : '') + '" placeholder="e.g. Best Seller, Starter, Export">' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label for="m_spec">Summary Specification Line *</label>' +
+              '<input type="text" id="m_spec" value="' + esc(item ? item.spec : '') + '" placeholder="24/min • PP 9-15mm • 220V" maxlength="160" required>' +
+              '<div class="field-error" id="err_spec"></div>' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label for="m_description">Promotional &amp; Technical Description *</label>' +
+              '<textarea id="m_description" rows="3" placeholder="Full paragraph description..." required>' + esc(item ? item.description : '') + '</textarea>' +
+              '<div class="field-error" id="err_description"></div>' +
+            '</div>' +
+
+            // Image Upload & Dropzone
+            '<div class="form-field full">' +
+              '<label>Product Photography *</label>' +
+              '<div class="dropzone" id="imgDropzone">' +
+                '<input type="file" id="imgFileInput" accept="image/jpeg,image/png,image/webp" style="display:none">' +
+                '<i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--muted);margin-bottom:8px"></i>' +
+                '<div style="font-weight:700;font-size:13.5px">Drop image file here, or <span style="text-decoration:underline">browse</span></div>' +
+                '<div style="font-size:12px;color:var(--muted-2);margin-top:4px">JPEG, PNG, or WebP up to 8 MB</div>' +
+              '</div>' +
+              '<div class="dropzone-preview" id="imgPreviewBox" style="' + (item && item.img ? '' : 'display:none') + '">' +
+                '<img id="imgPreviewEl" src="' + esc(item && item.img ? safeUrl(item.img) : '') + '" alt="Preview">' +
+                '<div style="flex:1;min-width:0">' +
+                  '<input type="text" id="m_img" value="' + esc(item ? item.img : '') + '" placeholder="https://..." style="width:100%;font-size:12.5px" required>' +
+                  '<div style="font-size:11px;color:var(--muted-2);margin-top:2px">Direct Cloudinary or HTTPS Image URL</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="field-error" id="err_img"></div>' +
+            '</div>' +
+
+            // Technical Specs Repeater
+            '<div class="form-field full">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+                '<label style="margin:0">Technical Specifications (Key / Value Pairs)</label>' +
+                '<button class="btn btn-ghost btn-sm" id="addSpecRowBtn" type="button" style="padding:4px 10px;font-size:12px">+ Add Row</button>' +
+              '</div>' +
+              '<div id="specsContainer"></div>' +
+            '</div>' +
+
+            // Options: is_active, is_compared, compare_order, sort_order
+            '<div class="form-field">' +
+              '<label style="display:flex;align-items:center;gap:8px;text-transform:none;cursor:pointer">' +
+                '<input type="checkbox" id="m_is_active"' + (item ? (item.is_active !== false ? ' checked' : '') : ' checked') + ' style="width:16px;height:16px">' +
+                '<span><b>Publish Active</b> (Visible on public catalog)</span>' +
+              '</label>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label style="display:flex;align-items:center;gap:8px;text-transform:none;cursor:pointer">' +
+                '<input type="checkbox" id="m_is_compared"' + (item && item.is_compared ? ' checked' : '') + ' style="width:16px;height:16px">' +
+                '<span><b>Compare Matrix</b> (Include in compare table)</span>' +
+              '</label>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_compare_order">Compare Order</label>' +
+              '<input type="number" id="m_compare_order" value="' + esc(item ? item.compare_order || 0 : 0) + '">' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="m_sort_order">Catalog Sort Order</label>' +
+              '<input type="number" id="m_sort_order" value="' + esc(item ? item.sort_order || 0 : 0) + '">' +
+            '</div>' +
+          '</div>' +
+        '</form>';
+
+      var footerHtml =
+        '<button class="btn btn-ghost btn-sm" id="modalCancelBtn" type="button">Cancel</button>' +
+        '<button class="btn btn-primary btn-sm" id="modalSaveBtn" type="button">' +
+          '<span>' + (isEdit ? 'Save Changes' : 'Create Product') + '</span>' +
+        '</button>';
+
+      var dlg = modal(isEdit ? 'Edit Product: ' + item.name : 'Add New Product', formHtml, footerHtml, function (root) {
+        var catSelect = root.querySelector('#m_category');
+        var tagSelect = root.querySelector('#m_tag');
+        var nameInput = root.querySelector('#m_name');
+        var slugInput = root.querySelector('#m_slug');
+        var specsBox = root.querySelector('#specsContainer');
+        var dropzone = root.querySelector('#imgDropzone');
+        var fileInput = root.querySelector('#imgFileInput');
+        var previewBox = root.querySelector('#imgPreviewBox');
+        var previewImg = root.querySelector('#imgPreviewEl');
+        var imgUrlInput = root.querySelector('#m_img');
+
+        function updateTags() {
+          var c = catSelect.value;
+          var tags = CATEGORY_TAG_MAP[c] || ['semi'];
+          tagSelect.innerHTML = tags.map(function (t) {
+            return '<option value="' + esc(t) + '"' + (t === tag ? ' selected' : '') + '>' + esc(t) + '</option>';
+          }).join('');
+        }
+        catSelect.addEventListener('change', function () {
+          tag = (CATEGORY_TAG_MAP[catSelect.value] || [])[0];
+          updateTags();
+        });
+        updateTags();
+
+        // Auto-generate slug on typing if creating new product
+        if (!isEdit) {
+          nameInput.addEventListener('input', function () {
+            slugInput.value = nameInput.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+          });
+        }
+
+        // Specs Repeater
+        function renderSpecs(list) {
+          specsBox.innerHTML = list.map(function (s, idx) {
+            return '<div class="repeater-row" data-idx="' + idx + '">' +
+              '<input type="text" class="spec-k" value="' + esc(s[0]) + '" placeholder="Key (e.g. Speed)" style="flex:1">' +
+              '<input type="text" class="spec-v" value="' + esc(s[1]) + '" placeholder="Value (e.g. 24/min)" style="flex:2">' +
+              '<button class="btn-icon danger del-spec-btn" type="button" title="Remove row">&times;</button>' +
+            '</div>';
+          }).join('');
+
+          specsBox.querySelectorAll('.del-spec-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+              var row = b.closest('.repeater-row');
+              var idx = parseInt(row.getAttribute('data-idx'), 10);
+              specs.splice(idx, 1);
+              renderSpecs(specs);
+            });
+          });
+        }
+        renderSpecs(specs);
+
+        root.querySelector('#addSpecRowBtn').addEventListener('click', function () {
+          specs.push(['', '']);
+          renderSpecs(specs);
+        });
+
+        // Image upload handling
+        dropzone.addEventListener('click', function () { fileInput.click(); });
+        dropzone.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', function () {
+          dropzone.classList.remove('dragover');
+        });
+        dropzone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileUpload(e.dataTransfer.files[0]);
+          }
+        });
+        fileInput.addEventListener('change', function () {
+          if (fileInput.files && fileInput.files[0]) {
+            handleFileUpload(fileInput.files[0]);
+          }
+        });
+
+        function handleFileUpload(file) {
+          if (!file) return;
+          if (file.size > 8 * 1024 * 1024) {
+            toast('File exceeds 8 MB size limit.', 'error');
+            return;
+          }
+
+          var formData = new FormData();
+          formData.append('image', file);
+
+          var origText = dropzone.querySelector('div').textContent;
+          dropzone.querySelector('div').textContent = 'Uploading to Cloudinary...';
+
+          api('/api/admin/media/upload', {
+            method: 'POST',
+            body: formData
+          })
+            .then(function (res) {
+              dropzone.querySelector('div').textContent = origText;
+              if (res.data && res.data.url) {
+                imgUrlInput.value = res.data.url;
+                previewImg.src = safeUrl(res.data.url);
+                previewBox.style.display = 'flex';
+                toast('Image uploaded successfully.');
+              }
+            })
+            .catch(function (err) {
+              dropzone.querySelector('div').textContent = origText;
+              toast('Image upload failed: ' + err.message, 'error');
+            });
+        }
+
+        imgUrlInput.addEventListener('input', function () {
+          var val = safeUrl(imgUrlInput.value);
+          if (val) {
+            previewImg.src = val;
+            previewBox.style.display = 'flex';
+          }
+        });
+
+        root.querySelector('#modalCancelBtn').addEventListener('click', closeModal);
+        root.querySelector('#modalSaveBtn').addEventListener('click', function () {
+          saveProduct(item, root);
+        });
+      });
+    }
+
+    function saveProduct(existing, root) {
+      // Clear previous field errors
+      root.querySelectorAll('.field-error').forEach(function (e) { e.textContent = ''; e.style.display = 'none'; });
+      root.querySelectorAll('.form-field').forEach(function (f) { f.classList.remove('has-error'); });
+
+      var name = root.querySelector('#m_name').value.trim();
+      var slug = root.querySelector('#m_slug').value.trim();
+      var category = root.querySelector('#m_category').value;
+      var tag = root.querySelector('#m_tag').value;
+      var price_label = root.querySelector('#m_price_label').value.trim();
+      var price_numeric = parseFloat(root.querySelector('#m_price_numeric').value);
+      var badge = root.querySelector('#m_badge').value.trim();
+      var spec = root.querySelector('#m_spec').value.trim();
+      var description = root.querySelector('#m_description').value.trim();
+      var img = root.querySelector('#m_img').value.trim();
+      var is_active = root.querySelector('#m_is_active').checked;
+      var is_compared = root.querySelector('#m_is_compared').checked;
+      var compare_order = parseInt(root.querySelector('#m_compare_order').value, 10) || 0;
+      var sort_order = parseInt(root.querySelector('#m_sort_order').value, 10) || 0;
+
+      // Extract specs rows
+      var currentSpecs = [];
+      root.querySelectorAll('.repeater-row').forEach(function (r) {
+        var k = r.querySelector('.spec-k').value.trim();
+        var v = r.querySelector('.spec-v').value.trim();
+        if (k || v) currentSpecs.push([k, v]);
+      });
+
+      var payload = {
+        name: name,
+        category: category,
+        tag: tag,
+        price_label: price_label,
+        spec: spec,
+        description: description,
+        img: img,
+        badge: badge,
+        specs: currentSpecs,
+        is_active: is_active,
+        is_compared: is_compared,
+        compare_order: compare_order,
+        sort_order: sort_order
+      };
+
+      if (!isNaN(price_numeric)) payload.price_numeric = price_numeric;
+      if (!existing) payload.slug = slug;
+
+      var saveBtn = root.querySelector('#modalSaveBtn');
+      saveBtn.disabled = true;
+
+      var endpoint = existing ? '/api/admin/products/' + existing._id : '/api/admin/products';
+      var method = existing ? 'PUT' : 'POST';
+
+      api(endpoint, {
+        method: method,
+        body: payload
+      })
+        .then(function (res) {
+          closeModal();
+          toast(res.data.name + (existing ? ' updated successfully.' : ' created successfully.'));
+          loadProducts();
+        })
+        .catch(function (err) {
+          saveBtn.disabled = false;
+          if (err.details && Array.isArray(err.details)) {
+            err.details.forEach(function (d) {
+              var fieldBox = root.querySelector('#err_' + d.field);
+              if (fieldBox) {
+                fieldBox.textContent = d.issue || d.message;
+                fieldBox.style.display = 'block';
+                fieldBox.closest('.form-field')?.classList.add('has-error');
+              }
+            });
+            toast('Please correct the validation errors in the form.', 'error');
+          } else {
+            toast(err.message || 'Failed saving product.', 'error');
+          }
+        });
+    }
+  };
+
   // 6. Router & Shell Initialization
   function initRouter() {
     var contentEl = document.getElementById('mainContent');

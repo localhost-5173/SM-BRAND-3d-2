@@ -1,6 +1,6 @@
-require('dotenv').config();
-const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+const fs = require('fs');
 const mongoose = require('mongoose');
 
 const connectDB = require('../config/db');
@@ -76,7 +76,7 @@ const INITIAL_SPARES = [
 ];
 
 function loadFallbackProducts() {
-  const filePath = path.join(__dirname, '../../assets/js/sm-data.js');
+  const filePath = path.join(__dirname, '../../../frontend/assets/js/sm-data.js');
   if (!fs.existsSync(filePath)) {
     throw new Error(`Fallback data file not found at ${filePath}`);
   }
@@ -87,7 +87,7 @@ function loadFallbackProducts() {
   fn(sandbox);
 
   if (!Array.isArray(sandbox.SM_FALLBACK) || sandbox.SM_FALLBACK.length === 0) {
-    throw new Error('Failed to parse SM_FALLBACK array from assets/js/sm-data.js');
+    throw new Error('Failed to parse SM_FALLBACK array from frontend/assets/js/sm-data.js');
   }
 
   return sandbox.SM_FALLBACK;
@@ -102,7 +102,7 @@ async function runSeed() {
 
   // 1. Seed & Verify Products
   const rawProducts = loadFallbackProducts();
-  logger.info(`Loaded ${rawProducts.length} products from assets/js/sm-data.js`);
+  logger.info(`Loaded ${rawProducts.length} products from frontend/assets/js/sm-data.js`);
 
   let validCount = 0;
   let invalidCount = 0;

@@ -1,5 +1,5 @@
-require('dotenv').config();
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
@@ -45,6 +45,7 @@ app.use((req, res, next) => {
     '/.env',
     '/.git',
     '/docs',
+    '/backend',
     '/src',
     '/node_modules',
     '/package.json',
@@ -71,11 +72,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', publicRoutes);
 
 // 7. Mount Admin Dashboard (Phase 4 placeholder)
-app.use('/admin', express.static(path.join(__dirname, 'admin')));
+app.use('/admin', express.static(path.join(__dirname, '../admin')));
 
 // 8. Serve Public Frontend Static Assets (Allowed: HTML files, assets/css, assets/js, assets/img)
 app.use(
-  express.static(path.join(__dirname), {
+  express.static(path.join(__dirname, '../frontend'), {
     dotfiles: 'ignore',
     index: ['index.html'],
     extensions: ['html']
@@ -95,7 +96,7 @@ app.all('/api/*', (req, res) => {
 
 // 10. Fallback for public SPA routing or static 404
 app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, 'index.html'));
+  res.status(404).sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
 // 11. Centralized JSON Error Handler

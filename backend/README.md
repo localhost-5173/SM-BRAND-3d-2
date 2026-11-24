@@ -44,9 +44,11 @@ npm install
 ## 2. Database Seeding & Administrator Setup
 
 ### 2.1. Seed the Database (`npm run seed`)
-Reads `assets/js/sm-data.js`, validates all 24 catalog products against the Mongoose schema, applies comparison matrix flags, seeds the singleton `Settings` document, and populates initial `Spare` parts:
+Reads `frontend/assets/js/sm-data.js`, validates all 24 catalog products against the Mongoose schema, applies comparison matrix flags, seeds the singleton `Settings` document, and populates initial `Spare` parts:
 
 ```bash
+npm run seed
+# Or from repository root:
 npm run seed
 ```
 

@@ -4,60 +4,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SM BRAND — Admin Portal (Phase 4 Placeholder)</title>
+  <title>SM BRAND — Admin Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/sm.css">
-  <style>
-    .admin-placeholder {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    .admin-card {
-      max-width: 520px;
-      width: 100%;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      padding: 36px;
-      text-align: center;
-    }
-
-    .admin-mark {
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      background: var(--text);
-      color: var(--bg);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 22px;
-      margin-bottom: 20px;
-    }
-  </style>
+  <link rel="stylesheet" href="/admin/admin.css">
 </head>
 
 <body>
-  <div class="admin-placeholder">
-    <div class="admin-card">
-      <div class="admin-mark">SM</div>
-      <h1 style="font-size:24px;margin-bottom:10px">Admin Portal</h1>
-      <p style="color:var(--muted);font-size:14px;margin-bottom:24px">
-        Backend API &amp; services active (Phase 2). Admin UI dashboard implementation scheduled for Phase 4.
-      </p>
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <a class="btn btn-primary" href="/api/health">Check API Health</a>
-        <a class="btn btn-ghost" href="/">Return to Website</a>
+  <div class="admin-shell">
+    <!-- Sidebar Backdrop for Mobile -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Admin Sidebar -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <div class="sidebar-header">
+        <a href="/admin/#overview" class="sidebar-logo">
+          <div class="brand-badge">SM</div>
+          <div class="brand-meta">
+            <span class="brand-title">SM BRAND</span>
+            <span class="brand-sub">Admin Portal</span>
+          </div>
+        </a>
       </div>
+
+      <nav class="sidebar-nav">
+        <a href="/admin/#overview" class="nav-link active">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/admin/#products" class="nav-link">
+          <i data-lucide="package"></i>
+          <span>Products</span>
+        </a>
+        <a href="/admin/#spares" class="nav-link">
+          <i data-lucide="wrench"></i>
+          <span>Spare Parts</span>
+        </a>
+        <a href="/admin/#leads" class="nav-link">
+          <i data-lucide="inbox"></i>
+          <span>Leads &amp; Quotes</span>
+        </a>
+        <a href="/admin/#settings" class="nav-link">
+          <i data-lucide="sliders"></i>
+          <span>Settings</span>
+        </a>
+
+        <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border)">
+          <a href="/" target="_blank" rel="noopener" class="nav-link" style="color:var(--muted-2)">
+            <i data-lucide="external-link"></i>
+            <span>View Public Site</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-box">
+          <div class="user-avatar" id="adminUserAvatar">A</div>
+          <div class="user-info">
+            <div class="user-name" id="adminUserName">Administrator</div>
+            <div class="user-email" id="adminUserEmail">admin@smbrand.pk</div>
+          </div>
+        </div>
+        <button class="btn-logout" id="logoutBtn" type="button">
+          <i data-lucide="log-out" style="width:14px;height:14px"></i>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="admin-main">
+      <!-- Mobile Sticky Topbar -->
+      <header class="mobile-topbar">
+        <a href="/admin/#overview" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text)">
+          <div class="brand-badge" style="width:30px;height:30px;font-size:14px">SM</div>
+          <span style="font-weight:800;font-size:14.5px">ADMIN</span>
+        </a>
+        <button class="btn-hamburger" id="hamburgerBtn" type="button" aria-label="Toggle navigation menu">
+          <i data-lucide="menu"></i>
+        </button>
+      </header>
+
+      <main class="content-wrapper" id="mainContent">
+        <!-- Views rendered by admin.js based on hash -->
+      </main>
     </div>
   </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="/assets/js/vendor/lucide.min.js"></script>
+  <script src="/admin/admin.js"></script>
 </body>
 
 </html>

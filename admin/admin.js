@@ -1339,6 +1339,289 @@
       });
   };
 
+  // --- SCREEN 6: Leads CRM & Quotation Requests ---
+  AdminApp.screens.leads = function (container) {
+    container.innerHTML =
+      '<div class="screen-header">' +
+        '<div>' +
+          '<h1 class="screen-title">Leads &amp; Quotation Requests</h1>' +
+          '<div class="screen-subtitle">Inquiries from contact form and WhatsApp quotation desk</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="admin-card">' +
+        '<div class="admin-card-header">' +
+          '<div class="toolbar" style="flex:1">' +
+            '<div class="search-box">' +
+              '<i data-lucide="search"></i>' +
+              '<input type="text" id="leadSearch" placeholder="Search by customer, phone, or city...">' +
+            '</div>' +
+            '<select class="filter-select" id="leadStatusFilter">' +
+              '<option value="all">All Statuses</option>' +
+              '<option value="new">New Inquiries</option>' +
+              '<option value="contacted">Contacted</option>' +
+              '<option value="quoted">Quoted</option>' +
+              '<option value="closed">Closed / Won</option>' +
+              '<option value="lost">Lost</option>' +
+            '</select>' +
+          '</div>' +
+          '<div style="font-size:13px;color:var(--muted)" id="leadCountBadge">Loading...</div>' +
+        '</div>' +
+        '<div class="table-responsive" id="leadsTableBox">' +
+          '<div style="padding:24px"><div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div></div>' +
+        '</div>' +
+        '<div class="pagination" id="leadsPagination" style="display:none">' +
+          '<div id="paginationInfo">Page 1 of 1</div>' +
+          '<div class="pagination-buttons">' +
+            '<button class="btn btn-ghost btn-sm" id="prevPageBtn" type="button">&larr; Previous</button>' +
+            '<button class="btn btn-ghost btn-sm" id="nextPageBtn" type="button">Next &rarr;</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var currentPage = 1;
+    var currentLimit = 15;
+    var totalPages = 1;
+    var searchInput = document.getElementById('leadSearch');
+    var statusSelect = document.getElementById('leadStatusFilter');
+    var countBadge = document.getElementById('leadCountBadge');
+    var tableBox = document.getElementById('leadsTableBox');
+    var paginationBox = document.getElementById('leadsPagination');
+    var paginationInfo = document.getElementById('paginationInfo');
+    var prevBtn = document.getElementById('prevPageBtn');
+    var nextBtn = document.getElementById('nextPageBtn');
+
+    function fetchLeads() {
+      var q = (searchInput.value || '').trim();
+      var status = statusSelect.value;
+      var url = '/api/admin/leads?page=' + currentPage + '&limit=' + currentLimit;
+      if (status !== 'all') url += '&status=' + encodeURIComponent(status);
+      if (q) url += '&search=' + encodeURIComponent(q);
+
+      tableBox.innerHTML = '<div style="padding:24px"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>';
+
+      api(url)
+        .then(function (res) {
+          var data = res.data || {};
+          var items = data.items || [];
+          var total = data.total || 0;
+          currentPage = data.page || 1;
+          totalPages = data.total_pages || 1;
+
+          countBadge.textContent = 'Showing ' + items.length + ' of ' + total + ' leads';
+
+          if (!items.length) {
+            tableBox.innerHTML =
+              '<div class="empty-state">' +
+                '<i data-lucide="inbox"></i>' +
+                '<p>No quotation inquiries match your criteria.</p>' +
+              '</div>';
+            paginationBox.style.display = 'none';
+            if (window.lucide) lucide.createIcons();
+            return;
+          }
+
+          var html =
+            '<table class="admin-table">' +
+              '<thead>' +
+                '<tr>' +
+                  '<th>Customer / Company</th>' +
+                  '<th>WhatsApp Phone</th>' +
+                  '<th>City / Area</th>' +
+                  '<th>Equipment Need</th>' +
+                  '<th>Date (PKT)</th>' +
+                  '<th>Status</th>' +
+                  '<th style="text-align:right">Actions</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' +
+                items.map(function (lead) {
+                  var rawWa = String(lead.whatsapp || '').replace(/\D/g, '');
+                  if (rawWa.startsWith('03') && rawWa.length === 11) rawWa = '92' + rawWa.substring(1);
+                  var waMsg = 'Salam ' + (lead.name || '') + ', SM Brand Packaging se rabta kar rahe hain aapki quote inquiry ke silsilay me.';
+                  var waUrl = 'https://wa.me/' + rawWa + '?text=' + encodeURIComponent(waMsg);
+
+                  return '<tr data-id="' + esc(lead._id) + '">' +
+                    '<td><span style="font-weight:700;color:var(--text)">' + esc(lead.name) + '</span></td>' +
+                    '<td>' +
+                      '<a href="tel:' + esc(rawWa) + '" style="color:var(--text);text-decoration:none;font-weight:600">' + esc(lead.whatsapp) + '</a>' +
+                    '</td>' +
+                    '<td>' + esc(lead.city) + '</td>' +
+                    '<td><span style="font-weight:600">' + esc(lead.need) + '</span></td>' +
+                    '<td style="color:var(--muted);font-size:12.5px;white-space:nowrap">' + formatDate(lead.createdAt) + '</td>' +
+                    '<td>' +
+                      '<select class="lead-status-select filter-select" style="padding:4px 8px;font-size:12px;font-weight:700">' +
+                        '<option value="new"' + (lead.status === 'new' ? ' selected' : '') + '>New</option>' +
+                        '<option value="contacted"' + (lead.status === 'contacted' ? ' selected' : '') + '>Contacted</option>' +
+                        '<option value="quoted"' + (lead.status === 'quoted' ? ' selected' : '') + '>Quoted</option>' +
+                        '<option value="closed"' + (lead.status === 'closed' ? ' selected' : '') + '>Closed / Won</option>' +
+                        '<option value="lost"' + (lead.status === 'lost' ? ' selected' : '') + '>Lost</option>' +
+                      '</select>' +
+                    '</td>' +
+                    '<td style="text-align:right;white-space:nowrap">' +
+                      '<a class="btn-wa-reply" href="' + esc(waUrl) + '" target="_blank" rel="noopener" style="margin-right:6px">' +
+                        '<i data-lucide="message-square" style="width:13px;height:13px"></i> Reply' +
+                      '</a>' +
+                      '<button class="btn btn-ghost btn-sm view-lead-btn" type="button" style="padding:5px 9px">Details</button>' +
+                    '</td>' +
+                  '</tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>';
+
+          tableBox.innerHTML = html;
+          if (window.lucide) lucide.createIcons();
+
+          // Bind Status Changes
+          tableBox.querySelectorAll('.lead-status-select').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+              var id = sel.closest('tr').getAttribute('data-id');
+              var newStatus = sel.value;
+              sel.disabled = true;
+
+              api('/api/admin/leads/' + id, {
+                method: 'PATCH',
+                body: { status: newStatus }
+              })
+                .then(function () {
+                  sel.disabled = false;
+                  toast('Lead status updated to ' + newStatus + '.');
+                })
+                .catch(function (err) {
+                  sel.disabled = false;
+                  toast('Failed updating status: ' + err.message, 'error');
+                });
+            });
+          });
+
+          // Bind Details Drawer / Modal
+          tableBox.querySelectorAll('.view-lead-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              var id = btn.closest('tr').getAttribute('data-id');
+              var lead = items.find(function (x) { return x._id === id; });
+              if (lead) openLeadDetailsModal(lead);
+            });
+          });
+
+          // Pagination Controls
+          paginationBox.style.display = totalPages > 1 ? 'flex' : 'none';
+          paginationInfo.textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (Total ' + total + ' leads)';
+          prevBtn.disabled = currentPage <= 1;
+          nextBtn.disabled = currentPage >= totalPages;
+        })
+        .catch(function (err) {
+          tableBox.innerHTML = '<div style="padding:24px;color:#f87171">Failed loading leads: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    var searchTimer = null;
+    searchInput.addEventListener('input', function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        currentPage = 1;
+        fetchLeads();
+      }, 250);
+    });
+
+    statusSelect.addEventListener('change', function () {
+      currentPage = 1;
+      fetchLeads();
+    });
+
+    prevBtn.addEventListener('click', function () {
+      if (currentPage > 1) {
+        currentPage--;
+        fetchLeads();
+      }
+    });
+
+    nextBtn.addEventListener('click', function () {
+      if (currentPage < totalPages) {
+        currentPage++;
+        fetchLeads();
+      }
+    });
+
+    fetchLeads();
+
+    function openLeadDetailsModal(lead) {
+      var rawWa = String(lead.whatsapp || '').replace(/\D/g, '');
+      if (rawWa.startsWith('03') && rawWa.length === 11) rawWa = '92' + rawWa.substring(1);
+      var waMsg = 'Salam ' + (lead.name || '') + ', SM Brand Packaging se rabta kar rahe hain aapki quote inquiry ke silsilay me.';
+      var waUrl = 'https://wa.me/' + rawWa + '?text=' + encodeURIComponent(waMsg);
+
+      var bodyHtml =
+        '<div style="display:flex;flex-direction:column;gap:18px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--panel-2);padding:14px 18px;border-radius:var(--radius-md);border:1px solid var(--border)">' +
+            '<div>' +
+              '<div style="font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:700">Customer</div>' +
+              '<div style="font-size:16px;font-weight:800;color:var(--text)">' + esc(lead.name) + '</div>' +
+              '<div style="font-size:13px;color:var(--muted)">' + esc(lead.city) + '</div>' +
+            '</div>' +
+            '<a class="btn-wa-reply" href="' + esc(waUrl) + '" target="_blank" rel="noopener" style="padding:8px 14px">' +
+              '<i data-lucide="message-square"></i> Open WhatsApp Chat' +
+            '</a>' +
+          '</div>' +
+
+          '<div class="form-grid">' +
+            '<div class="form-field">' +
+              '<label>Phone Number</label>' +
+              '<div style="font-weight:700;color:var(--text);font-size:14px">' + esc(lead.whatsapp) + '</div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label>Equipment Requirement</label>' +
+              '<div style="font-weight:700;color:var(--text);font-size:14px">' + esc(lead.need) + '</div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label>Submission Date</label>' +
+              '<div style="color:var(--muted);font-size:13px">' + formatDate(lead.createdAt) + '</div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label>Source Page</label>' +
+              '<div style="color:var(--muted);font-size:13px">' + esc(lead.source_page || 'contact.html') + '</div>' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label>Customer Message</label>' +
+              '<div style="background:var(--panel-3);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;font-size:13.5px;color:var(--text);line-height:1.6;white-space:pre-wrap">' +
+                esc(lead.message || 'No additional note provided by customer.') +
+              '</div>' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label for="det_notes">Internal Sales Notes</label>' +
+              '<textarea id="det_notes" rows="3" placeholder="Enter follow-up notes, quoted prices, delivery timeline...">' + esc(lead.admin_notes || '') + '</textarea>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      var footerHtml =
+        '<button class="btn btn-ghost btn-sm" id="closeDetailsBtn" type="button">Close</button>' +
+        '<button class="btn btn-primary btn-sm" id="saveNotesBtn" type="button">Save Notes</button>';
+
+      var dlg = modal('Quotation Request Details', bodyHtml, footerHtml, function (root) {
+        root.querySelector('#closeDetailsBtn').addEventListener('click', closeModal);
+        root.querySelector('#saveNotesBtn').addEventListener('click', function () {
+          var notes = root.querySelector('#det_notes').value.trim();
+          var saveBtn = root.querySelector('#saveNotesBtn');
+          saveBtn.disabled = true;
+
+          api('/api/admin/leads/' + lead._id, {
+            method: 'PATCH',
+            body: { admin_notes: notes }
+          })
+            .then(function () {
+              saveBtn.disabled = false;
+              lead.admin_notes = notes;
+              toast('Sales notes saved.');
+              closeModal();
+            })
+            .catch(function (err) {
+              saveBtn.disabled = false;
+              toast('Failed saving notes: ' + err.message, 'error');
+            });
+        });
+      });
+    }
+  };
+
   // 6. Router & Shell Initialization
   function initRouter() {
     var contentEl = document.getElementById('mainContent');

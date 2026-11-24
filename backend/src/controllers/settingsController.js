@@ -1,5 +1,5 @@
 const Settings = require('../models/Settings');
-const { isValidWhatsApp } = require('../utils/phoneNormalizer');
+const { normalizeWhatsApp, isValidWhatsApp } = require('../utils/phoneNormalizer');
 
 /**
  * Public: Get global contact coordinates, phone numbers, and depot locations.
@@ -49,7 +49,7 @@ async function updateAdminSettings(req, res, next) {
           }
         });
       }
-      update.whatsapp_number = whatsapp_number;
+      update.whatsapp_number = normalizeWhatsApp(whatsapp_number);
     }
 
     if (phone_display !== undefined) update.phone_display = String(phone_display).trim();

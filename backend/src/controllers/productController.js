@@ -148,10 +148,8 @@ async function updateAdminProduct(req, res, next) {
     // Exclude slug from update payload
     delete req.body.slug;
 
-    const updated = await Product.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    Object.assign(existing, req.body);
+    const updated = await existing.save();
 
     return res.json({
       success: true,

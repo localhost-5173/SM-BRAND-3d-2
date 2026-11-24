@@ -38,32 +38,44 @@ app.use(cookieParser());
 // 4. NoSQL injection attack mitigation (strips $ and . from query, params, body)
 app.use(mongoSanitize);
 
-// 5. Explicit protection against exposing sensitive repository files over HTTP
-app.use((req, res, next) => {
-  const normalizedPath = req.path.toLowerCase();
-  const blockedPrefixes = [
-    '/.env',
-    '/.git',
-    '/docs',
-    '/backend',
-    '/src',
-    '/node_modules',
-    '/package.json',
-    '/package-lock.json',
-    '/server.js',
-    '/readme.md'
-  ];
+// 5. Strict Whitelist: Only explicitly allowed public paths may be served over HTTP
+const ALLOWED_ROOT_PATHS = new Set([
+  '/',
+  '/index.html',
+  '/machines.html',
+  '/product.html',
+  '/rolls.html',
+  '/tools.html',
+  '/service.html',
+  '/contact.html',
+  '/favicon.ico',
+  '/robots.txt',
+  '/index',
+  '/machines',
+  '/product',
+  '/rolls',
+  '/tools',
+  '/service',
+  '/contact'
+]);
 
-  for (const blocked of blockedPrefixes) {
-    if (
-      normalizedPath === blocked ||
-      normalizedPath.startsWith(blocked + '/') ||
-      normalizedPath.startsWith(blocked + '.')
-    ) {
-      return res.status(404).send('Not Found');
-    }
-  }
-  next();
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+
+  // Allow REST API endpoints
+  if (p === '/api' || p.startsWith('/api/')) return next();
+
+  // Allow Admin dashboard
+  if (p === '/admin' || p.startsWith('/admin/')) return next();
+
+  // Allow Static frontend assets (css, js, img)
+  if (p.startsWith('/assets/')) return next();
+
+  // Allow Whitelisted root pages
+  if (ALLOWED_ROOT_PATHS.has(p)) return next();
+
+  // Everything else (e.g. /.env, /docs/*, /backend/*, /BACKEND_README.md, /.gitignore, /package-lock.json) is blocked
+  return res.status(404).send('Not Found');
 });
 
 // 6. Mount REST API Routers
@@ -94,9 +106,9 @@ app.all('/api/*', (req, res) => {
   });
 });
 
-// 10. Fallback for public SPA routing or static 404
+// 10. Fallback 404 Handler
 app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, '../frontend/index.html'));
+  res.status(404).send('Not Found');
 });
 
 // 11. Centralized JSON Error Handler

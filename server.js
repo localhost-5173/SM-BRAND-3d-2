@@ -54,7 +54,11 @@ app.use((req, res, next) => {
   ];
 
   for (const blocked of blockedPrefixes) {
-    if (normalizedPath === blocked || normalizedPath.startsWith(blocked + '/')) {
+    if (
+      normalizedPath === blocked ||
+      normalizedPath.startsWith(blocked + '/') ||
+      normalizedPath.startsWith(blocked + '.')
+    ) {
       return res.status(404).send('Not Found');
     }
   }

@@ -856,6 +856,283 @@
     }
   };
 
+  // --- SCREEN 4: Spare Parts Management Controller ---
+  AdminApp.screens.spares = function (container) {
+    container.innerHTML =
+      '<div class="screen-header">' +
+        '<div>' +
+          '<h1 class="screen-title">Replacement Spare Parts</h1>' +
+          '<div class="screen-subtitle">Maintain in-stock components and wear items for strapping machinery</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm" id="addSpareBtn" type="button">' +
+          '<i data-lucide="plus" style="width:16px;height:16px"></i> Add Spare Part' +
+        '</button>' +
+      '</div>' +
+      '<div class="admin-card">' +
+        '<div class="admin-card-header">' +
+          '<div class="toolbar">' +
+            '<div class="search-box">' +
+              '<i data-lucide="search"></i>' +
+              '<input type="text" id="spareSearch" placeholder="Search spares by name or model...">' +
+            '</div>' +
+          '</div>' +
+          '<div style="font-size:13px;color:var(--muted)" id="spareCountBadge">Loading...</div>' +
+        '</div>' +
+        '<div class="table-responsive" id="sparesTableBox">' +
+          '<div style="padding:24px"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>' +
+        '</div>' +
+      '</div>';
+
+    var allSpares = [];
+    var searchInput = document.getElementById('spareSearch');
+    var countBadge = document.getElementById('spareCountBadge');
+    var tableBox = document.getElementById('sparesTableBox');
+
+    function renderTable() {
+      var q = (searchInput.value || '').trim().toLowerCase();
+
+      var filtered = allSpares.filter(function (s) {
+        return !q || (s.name && s.name.toLowerCase().indexOf(q) !== -1) || (s.compatible_models && s.compatible_models.toLowerCase().indexOf(q) !== -1);
+      });
+
+      countBadge.textContent = 'Showing ' + filtered.length + ' of ' + allSpares.length + ' spare parts';
+
+      if (!filtered.length) {
+        tableBox.innerHTML =
+          '<div class="empty-state">' +
+            '<i data-lucide="wrench"></i>' +
+            '<p>No spare parts found. Click "Add Spare Part" to add one.</p>' +
+          '</div>';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      var html =
+        '<table class="admin-table">' +
+          '<thead>' +
+            '<tr>' +
+              '<th>Part Name</th>' +
+              '<th>Compatible Models</th>' +
+              '<th>Price Label</th>' +
+              '<th>Inventory Status</th>' +
+              '<th>Visibility</th>' +
+              '<th style="text-align:right">Actions</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' +
+            filtered.map(function (s) {
+              var isActive = s.is_active !== false;
+              var pillCls = s.status_badge === 'in_stock' ? 'active' : (s.status_badge === 'low_stock' ? 'warning' : 'muted');
+              var pillText = s.status_badge === 'in_stock' ? 'In Stock' : (s.status_badge === 'low_stock' ? 'Low Stock' : 'On Order');
+
+              return '<tr data-id="' + esc(s._id) + '">' +
+                '<td><span style="font-weight:700;color:var(--text)">' + esc(s.name) + '</span></td>' +
+                '<td><span style="color:var(--muted)">' + esc(s.compatible_models || 'All Models') + '</span></td>' +
+                '<td><b>' + esc(s.price_label || 'On Inquiry') + '</b></td>' +
+                '<td><span class="status-pill ' + pillCls + '"><span class="led"></span> ' + esc(pillText) + '</span></td>' +
+                '<td>' +
+                  '<button class="status-pill ' + (isActive ? 'active' : 'muted') + ' toggle-spare-btn" type="button" style="cursor:pointer">' +
+                    '<span class="led"></span> ' + (isActive ? 'Active' : 'Hidden') +
+                  '</button>' +
+                '</td>' +
+                '<td style="text-align:right;white-space:nowrap">' +
+                  '<button class="btn btn-ghost btn-sm edit-spare-btn" type="button" style="padding:5px 10px;margin-right:6px">Edit</button>' +
+                  '<button class="btn btn-ghost btn-sm delete-spare-btn" type="button" style="padding:5px 10px;color:#f87171">Delete</button>' +
+                '</td>' +
+              '</tr>';
+            }).join('') +
+          '</tbody>' +
+        '</table>';
+
+      tableBox.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+
+      // Bind actions
+      tableBox.querySelectorAll('.toggle-spare-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.closest('tr').getAttribute('data-id');
+          var item = allSpares.find(function (x) { return x._id === id; });
+          if (!item) return;
+
+          var next = item.is_active === false;
+          btn.disabled = true;
+
+          api('/api/admin/spares/' + id, {
+            method: 'PUT',
+            body: { is_active: next }
+          })
+            .then(function (res) {
+              item.is_active = res.data.is_active;
+              toast(item.name + (next ? ' active on site.' : ' hidden from site.'));
+              renderTable();
+            })
+            .catch(function (err) {
+              btn.disabled = false;
+              toast('Update failed: ' + err.message, 'error');
+            });
+        });
+      });
+
+      tableBox.querySelectorAll('.edit-spare-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.closest('tr').getAttribute('data-id');
+          var item = allSpares.find(function (x) { return x._id === id; });
+          if (item) openSpareModal(item);
+        });
+      });
+
+      tableBox.querySelectorAll('.delete-spare-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.closest('tr').getAttribute('data-id');
+          var item = allSpares.find(function (x) { return x._id === id; });
+          if (!item) return;
+
+          confirmModal(
+            'Delete Spare Part',
+            'Are you sure you want to permanently delete "' + item.name + '"? This will remove it from the Service & Spares page.',
+            function () {
+              api('/api/admin/spares/' + id, { method: 'DELETE' })
+                .then(function () {
+                  allSpares = allSpares.filter(function (x) { return x._id !== id; });
+                  toast(item.name + ' deleted.');
+                  renderTable();
+                })
+                .catch(function (err) { toast('Delete failed: ' + err.message, 'error'); });
+            },
+            'Delete Permanently'
+          );
+        });
+      });
+    }
+
+    function loadSpares() {
+      api('/api/admin/spares')
+        .then(function (res) {
+          allSpares = res.data || [];
+          renderTable();
+        })
+        .catch(function (err) {
+          tableBox.innerHTML = '<div style="padding:24px;color:#f87171">Failed loading spare parts: ' + esc(err.message) + '</div>';
+        });
+    }
+
+    searchInput.addEventListener('input', renderTable);
+    document.getElementById('addSpareBtn').addEventListener('click', function () {
+      openSpareModal(null);
+    });
+
+    loadSpares();
+
+    function openSpareModal(item) {
+      var isEdit = Boolean(item);
+      var statusBadge = item ? item.status_badge : 'in_stock';
+
+      var formHtml =
+        '<form id="spareModalForm" novalidate>' +
+          '<div class="form-grid">' +
+            '<div class="form-field full">' +
+              '<label for="sp_name">Part Name *</label>' +
+              '<input type="text" id="sp_name" value="' + esc(item ? item.name : '') + '" placeholder="e.g. Tungsten Heating Blade Assembly" required>' +
+              '<div class="field-error" id="err_name"></div>' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label for="sp_models">Compatible Models *</label>' +
+              '<input type="text" id="sp_models" value="' + esc(item ? item.compatible_models : 'SM-601 / SM-801') + '" placeholder="e.g. SM-601 / SM-801 / SM-450" required>' +
+              '<div class="field-error" id="err_compatible_models"></div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="sp_price_label">Price Label *</label>' +
+              '<input type="text" id="sp_price_label" value="' + esc(item ? item.price_label : 'Rs 4,500') + '" placeholder="Rs 4,500" required>' +
+              '<div class="field-error" id="err_price_label"></div>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="sp_price_numeric">Numeric Price (Optional)</label>' +
+              '<input type="number" id="sp_price_numeric" value="' + esc(item && item.price_numeric !== undefined ? item.price_numeric : '') + '" placeholder="4500">' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="sp_badge">Inventory Status *</label>' +
+              '<select id="sp_badge">' +
+                '<option value="in_stock"' + (statusBadge === 'in_stock' ? ' selected' : '') + '>In Stock (Ready)</option>' +
+                '<option value="low_stock"' + (statusBadge === 'low_stock' ? ' selected' : '') + '>Low Stock (Limited)</option>' +
+                '<option value="on_order"' + (statusBadge === 'on_order' ? ' selected' : '') + '>On Order (Lead Time)</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="form-field">' +
+              '<label for="sp_sort">Sort Order</label>' +
+              '<input type="number" id="sp_sort" value="' + esc(item ? item.sort_order || 0 : 0) + '">' +
+            '</div>' +
+            '<div class="form-field full">' +
+              '<label style="display:flex;align-items:center;gap:8px;text-transform:none;cursor:pointer">' +
+                '<input type="checkbox" id="sp_active"' + (item ? (item.is_active !== false ? ' checked' : '') : ' checked') + ' style="width:16px;height:16px">' +
+                '<span><b>Publish Active</b> (Display in Service &amp; Spares table)</span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
+        '</form>';
+
+      var footerHtml =
+        '<button class="btn btn-ghost btn-sm" id="spareCancelBtn" type="button">Cancel</button>' +
+        '<button class="btn btn-primary btn-sm" id="spareSaveBtn" type="button">' +
+          '<span>' + (isEdit ? 'Save Changes' : 'Create Spare Part') + '</span>' +
+        '</button>';
+
+      var dlg = modal(isEdit ? 'Edit Spare Part: ' + item.name : 'Add New Spare Part', formHtml, footerHtml, function (root) {
+        root.querySelector('#spareCancelBtn').addEventListener('click', closeModal);
+        root.querySelector('#spareSaveBtn').addEventListener('click', function () {
+          root.querySelectorAll('.field-error').forEach(function (e) { e.style.display = 'none'; });
+          root.querySelectorAll('.form-field').forEach(function (f) { f.classList.remove('has-error'); });
+
+          var name = root.querySelector('#sp_name').value.trim();
+          var models = root.querySelector('#sp_models').value.trim();
+          var price_label = root.querySelector('#sp_price_label').value.trim();
+          var price_numeric = parseFloat(root.querySelector('#sp_price_numeric').value);
+          var status_badge = root.querySelector('#sp_badge').value;
+          var sort_order = parseInt(root.querySelector('#sp_sort').value, 10) || 0;
+          var is_active = root.querySelector('#sp_active').checked;
+
+          var payload = {
+            name: name,
+            compatible_models: models,
+            price_label: price_label,
+            status_badge: status_badge,
+            sort_order: sort_order,
+            is_active: is_active
+          };
+          if (!isNaN(price_numeric)) payload.price_numeric = price_numeric;
+
+          var saveBtn = root.querySelector('#spareSaveBtn');
+          saveBtn.disabled = true;
+
+          var endpoint = isEdit ? '/api/admin/spares/' + item._id : '/api/admin/spares';
+          var method = isEdit ? 'PUT' : 'POST';
+
+          api(endpoint, { method: method, body: payload })
+            .then(function (res) {
+              closeModal();
+              toast(res.data.name + (isEdit ? ' updated.' : ' created.'));
+              loadSpares();
+            })
+            .catch(function (err) {
+              saveBtn.disabled = false;
+              if (err.details && Array.isArray(err.details)) {
+                err.details.forEach(function (d) {
+                  var f = root.querySelector('#err_' + d.field);
+                  if (f) {
+                    f.textContent = d.issue || d.message;
+                    f.style.display = 'block';
+                    f.closest('.form-field')?.classList.add('has-error');
+                  }
+                });
+                toast('Please correct the errors in the form.', 'error');
+              } else {
+                toast(err.message || 'Error saving spare part.', 'error');
+              }
+            });
+        });
+      });
+    }
+  };
+
   // 6. Router & Shell Initialization
   function initRouter() {
     var contentEl = document.getElementById('mainContent');

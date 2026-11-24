@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign In — SM BRAND Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/sm.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .login-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 40px 36px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+      position: relative;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: var(--text);
+      color: var(--bg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 22px;
+      margin-bottom: 16px;
+      letter-spacing: -0.04em;
+    }
+
+    .login-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .login-subtitle {
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .form-control {
+      width: 100%;
+      background: var(--panel-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px;
+      color: var(--text);
+      font-size: 14.5px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+      box-sizing: border-box;
+    }
+
+    .form-control:focus {
+      border-color: var(--border-hover);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      font-size: 14.5px;
+      font-weight: 700;
+      border-radius: var(--radius-md);
+      margin-top: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .error-banner {
+      display: none;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      color: #f87171;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .error-banner.visible {
+      display: block;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12.5px;
+      color: var(--muted-2);
+    }
+
+    .login-footer a {
+      color: var(--muted);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-container">
+    <div class="login-card" id="loginCard">
+      <div class="login-header">
+        <div class="brand-mark">SM</div>
+        <h1 class="login-title">Admin Portal</h1>
+        <p class="login-subtitle">Sign in to manage catalog, leads &amp; coordinates</p>
+      </div>
+
+      <div class="error-banner" id="loginError" role="alert"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="email">Administrator Email</label>
+          <input class="form-control" type="email" id="email" name="email" autocomplete="email" placeholder="admin@smbrand.pk" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input class="form-control" type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••••••" required>
+        </div>
+
+        <button class="btn btn-primary btn-submit" type="submit" id="submitBtn">
+          <span>Sign In to Dashboard</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <div class="login-footer">
+      <span>SM BRAND Industrial Packaging Systems</span> &bull; <a href="/">Back to Public Site</a>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // 1. Check existing session
+      fetch('/api/auth/me', { credentials: 'same-origin' })
+        .then(function (r) {
+          if (r.ok) {
+            window.location.replace('/admin/#overview');
+          }
+        })
+        .catch(function () {});
+
+      var form = document.getElementById('loginForm');
+      var emailInput = document.getElementById('email');
+      var passInput = document.getElementById('password');
+      var errorBox = document.getElementById('loginError');
+      var submitBtn = document.getElementById('submitBtn');
+
+      function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.remove('visible');
+        void errorBox.offsetWidth; // Trigger reflow for animation
+        errorBox.classList.add('visible');
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        errorBox.classList.remove('visible');
+
+        var email = (emailInput.value || '').trim();
+        var password = (passInput.value || '').trim();
+
+        if (!email) {
+          showError('Please enter your administrator email.');
+          emailInput.focus();
+          return;
+        }
+
+        if (!password) {
+          showError('Please enter your password.');
+          passInput.focus();
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.querySelector('span').textContent = 'Signing in...';
+
+        fetch('/api/auth/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: email, password: password })
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              return { status: res.status, ok: res.ok, data: data };
+            });
+          })
+          .then(function (result) {
+            if (result.ok && result.data && result.data.success) {
+              window.location.replace('/admin/#overview');
+            } else {
+              var msg = (result.data && result.data.error && result.data.error.message) || 'Invalid email or password.';
+              showError(msg);
+              submitBtn.disabled = false;
+              submitBtn.querySelector('span').textContent = 'Sign In to Dashboard';
+            }
+          })
+          .catch(function (err) {
+            showError('Network error connecting to server. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.querySelector('span').textContent = 'Sign In to Dashboard';
+          });
+      });
+    })();
+  </script>
+</body>
+
+</html>

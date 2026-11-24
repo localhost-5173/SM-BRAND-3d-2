@@ -1133,6 +1133,212 @@
     }
   };
 
+  // --- SCREEN 5: Global Settings & Contact Coordinates ---
+  AdminApp.screens.settings = function (container) {
+    container.innerHTML =
+      '<div class="screen-header">' +
+        '<div>' +
+          '<h1 class="screen-title">Global Settings &amp; Contact Coordinates</h1>' +
+          '<div class="screen-subtitle">Changes made here automatically update all contact numbers and depot addresses on the public website</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="admin-card" id="settingsCardBox">' +
+        '<div style="padding:32px"><div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div></div>' +
+      '</div>';
+
+    api('/api/admin/settings')
+      .then(function (res) {
+        var s = res.data || {};
+        var depots = Array.isArray(s.depots) ? JSON.parse(JSON.stringify(s.depots)) : [];
+
+        var html =
+          '<form id="settingsForm" style="padding:28px" novalidate>' +
+            '<div style="margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:16px">' +
+              '<h3 style="margin:0 0 4px 0;font-size:16px;color:var(--text)">Primary WhatsApp &amp; Phone Routing</h3>' +
+              '<p style="margin:0;font-size:12.5px;color:var(--muted)">All quotation buttons and floating WhatsApp icons point to this number.</p>' +
+            '</div>' +
+            '<div class="form-grid">' +
+              '<div class="form-field">' +
+                '<label for="set_wa">Primary WhatsApp (Raw Digits) *</label>' +
+                '<input type="text" id="set_wa" value="' + esc(s.whatsapp_number || '923102261760') + '" placeholder="e.g. 923102261760" required>' +
+                '<div class="field-hint" id="waPreviewText" style="color:var(--green);font-weight:600">Preview: https://wa.me/' + esc(s.whatsapp_number || '923102261760') + '</div>' +
+                '<div class="field-error" id="err_whatsapp_number"></div>' +
+              '</div>' +
+              '<div class="form-field">' +
+                '<label for="set_phone">Phone Display Text *</label>' +
+                '<input type="text" id="set_phone" value="' + esc(s.phone_display || '+92 310 2261760') + '" placeholder="+92 310 2261760" required>' +
+                '<div class="field-hint">Visible in header bar, engineering desk, and footer.</div>' +
+              '</div>' +
+              '<div class="form-field full">' +
+                '<label for="set_email">Official Inquiry Email *</label>' +
+                '<input type="email" id="set_email" value="' + esc(s.email || 'ar7776845@gmail.com') + '" placeholder="ar7776845@gmail.com" required>' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="margin:28px 0 20px;border-bottom:1px solid var(--border);padding-bottom:16px">' +
+              '<h3 style="margin:0 0 4px 0;font-size:16px;color:var(--text)">Operating Hours &amp; Response SLA</h3>' +
+              '<p style="margin:0;font-size:12.5px;color:var(--muted)">Displayed on contact page and inquiry confirmation notices.</p>' +
+            '</div>' +
+            '<div class="form-grid">' +
+              '<div class="form-field">' +
+                '<label for="set_hours">Standard Operating Hours</label>' +
+                '<input type="text" id="set_hours" value="' + esc(s.operating_hours || 'Monday – Saturday: 9:00 AM – 9:00 PM PKT') + '">' +
+              '</div>' +
+              '<div class="form-field">' +
+                '<label for="set_emg_hours">Emergency Dispatch Hours</label>' +
+                '<input type="text" id="set_emg_hours" value="' + esc(s.emergency_hours || 'Sunday: 11:00 AM – 5:00 PM (Emergency WhatsApp Dispatch)') + '">' +
+              '</div>' +
+              '<div class="form-field full">' +
+                '<label for="set_response_note">Response Time Note</label>' +
+                '<input type="text" id="set_response_note" value="' + esc(s.response_time_note || 'Average response ~6 min • Mon–Sat 9am – 9pm PKT') + '">' +
+              '</div>' +
+            '</div>' +
+
+            '<div style="margin:28px 0 20px;border-bottom:1px solid var(--border);padding-bottom:16px;display:flex;justify-content:space-between;align-items:center">' +
+              '<div>' +
+                '<h3 style="margin:0 0 4px 0;font-size:16px;color:var(--text)">Physical Depots &amp; Walk-In Hubs</h3>' +
+                '<p style="margin:0;font-size:12.5px;color:var(--muted)">Regional service centers and spares warehouses displayed on contact page.</p>' +
+              '</div>' +
+              '<button class="btn btn-ghost btn-sm" id="addDepotBtn" type="button">+ Add Depot Location</button>' +
+            '</div>' +
+
+            '<div id="depotsContainer" style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px"></div>' +
+
+            '<div style="display:flex;justify-content:flex-end;border-top:1px solid var(--border);padding-top:20px">' +
+              '<button class="btn btn-primary" id="saveSettingsBtn" type="submit">' +
+                '<i data-lucide="check" style="width:16px;height:16px"></i> Save All Settings' +
+              '</button>' +
+            '</div>' +
+          '</form>';
+
+        var cardBox = document.getElementById('settingsCardBox');
+        cardBox.innerHTML = html;
+        if (window.lucide) lucide.createIcons();
+
+        // Live preview of WhatsApp
+        var waInput = cardBox.querySelector('#set_wa');
+        var waPreview = cardBox.querySelector('#waPreviewText');
+        function updateWaPreview() {
+          var raw = waInput.value.replace(/\D/g, '');
+          if (raw.startsWith('03') && raw.length === 11) raw = '92' + raw.substring(1);
+          waPreview.textContent = 'Preview: https://wa.me/' + (raw || '923102261760');
+        }
+        waInput.addEventListener('input', updateWaPreview);
+
+        // Depots Repeater
+        var depotsBox = cardBox.querySelector('#depotsContainer');
+        function renderDepots() {
+          if (!depots.length) {
+            depotsBox.innerHTML = '<div style="color:var(--muted);font-size:13.5px;padding:12px;background:var(--panel-2);border-radius:var(--radius-md);text-align:center">No depots configured. Click "+ Add Depot Location" above.</div>';
+            return;
+          }
+
+          depotsBox.innerHTML = depots.map(function (d, idx) {
+            return '<div class="admin-card" style="margin:0;background:var(--panel-2)" data-idx="' + idx + '">' +
+              '<div class="admin-card-header" style="padding:12px 18px">' +
+                '<span style="font-weight:700;font-size:13.5px">' + esc(d.city || 'Depot ' + (idx + 1)) + (d.hub_name ? ' — ' + esc(d.hub_name) : '') + '</span>' +
+                '<button class="btn-icon danger del-depot-btn" type="button" title="Remove depot">&times;</button>' +
+              '</div>' +
+              '<div class="admin-card-body" style="padding:18px">' +
+                '<div class="form-grid">' +
+                  '<div class="form-field">' +
+                    '<label>City Name *</label>' +
+                    '<input type="text" class="d-city" value="' + esc(d.city || '') + '" placeholder="Karachi" required>' +
+                  '</div>' +
+                  '<div class="form-field">' +
+                    '<label>Hub Display Name *</label>' +
+                    '<input type="text" class="d-hub" value="' + esc(d.hub_name || '') + '" placeholder="Karachi Central" required>' +
+                  '</div>' +
+                  '<div class="form-field full">' +
+                    '<label>Physical Street Address *</label>' +
+                    '<input type="text" class="d-addr" value="' + esc(d.address || '') + '" placeholder="Plot 14, S.I.T.E Industrial Area, Karachi" required>' +
+                  '</div>' +
+                  '<div class="form-field">' +
+                    '<label>Hub Type</label>' +
+                    '<input type="text" class="d-type" value="' + esc(d.hub_type || 'Direct Display & Spares Depot') + '">' +
+                  '</div>' +
+                  '<div class="form-field">' +
+                    '<label>Operating Hours</label>' +
+                    '<input type="text" class="d-hours" value="' + esc(d.hours || 'Mon–Sat 9:00 AM – 9:00 PM PKT') + '">' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+
+          depotsBox.querySelectorAll('.del-depot-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+              var idx = parseInt(b.closest('[data-idx]').getAttribute('data-idx'), 10);
+              depots.splice(idx, 1);
+              renderDepots();
+            });
+          });
+        }
+        renderDepots();
+
+        cardBox.querySelector('#addDepotBtn').addEventListener('click', function () {
+          depots.push({
+            city: 'Lahore',
+            hub_name: 'Lahore Hub',
+            address: 'Sundar Industrial Estate',
+            hub_type: 'Technician Base',
+            hours: 'Mon–Sat 9:00 AM – 8:00 PM PKT',
+            note: ''
+          });
+          renderDepots();
+        });
+
+        // Form Submit
+        cardBox.querySelector('#settingsForm').addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          // Sync depots from DOM
+          var updatedDepots = [];
+          depotsBox.querySelectorAll('[data-idx]').forEach(function (row) {
+            updatedDepots.push({
+              city: row.querySelector('.d-city').value.trim(),
+              hub_name: row.querySelector('.d-hub').value.trim(),
+              address: row.querySelector('.d-addr').value.trim(),
+              hub_type: row.querySelector('.d-type').value.trim(),
+              hours: row.querySelector('.d-hours').value.trim(),
+              note: ''
+            });
+          });
+
+          var payload = {
+            whatsapp_number: waInput.value.trim(),
+            phone_display: cardBox.querySelector('#set_phone').value.trim(),
+            email: cardBox.querySelector('#set_email').value.trim(),
+            operating_hours: cardBox.querySelector('#set_hours').value.trim(),
+            emergency_hours: cardBox.querySelector('#set_emg_hours').value.trim(),
+            response_time_note: cardBox.querySelector('#set_response_note').value.trim(),
+            depots: updatedDepots
+          };
+
+          var saveBtn = cardBox.querySelector('#saveSettingsBtn');
+          saveBtn.disabled = true;
+
+          api('/api/admin/settings', {
+            method: 'PUT',
+            body: payload
+          })
+            .then(function (res) {
+              saveBtn.disabled = false;
+              toast('Settings saved successfully. Public website updated.');
+              // Also update sessionStorage cache for instant public paint
+              try { sessionStorage.setItem('sm_settings', JSON.stringify(res.data)); } catch (e) {}
+            })
+            .catch(function (err) {
+              saveBtn.disabled = false;
+              toast(err.message || 'Failed saving settings.', 'error');
+            });
+        });
+      })
+      .catch(function (err) {
+        document.getElementById('settingsCardBox').innerHTML = '<div style="padding:24px;color:#f87171">Failed loading settings: ' + esc(err.message) + '</div>';
+      });
+  };
+
   // 6. Router & Shell Initialization
   function initRouter() {
     var contentEl = document.getElementById('mainContent');
